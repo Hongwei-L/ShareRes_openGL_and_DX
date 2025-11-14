@@ -377,9 +377,11 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="OpenGLSharedRenderer.cpp" />
     <ClCompile Include="SharedResource.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="OpenGLSharedRenderer.h" />
   </ItemGroup>
   <ItemGroup>
   </ItemGroup>
