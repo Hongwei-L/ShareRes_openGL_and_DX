@@ -8,6 +8,7 @@
 
 This demo illustrates how to use the WGL_NV_DX_Interop extension to efficiently share a resource between DirectX and OpenGL rendering APIs. The intent is to provide common variations of the implementation, as well as a way to enable a performance comparison between CPU and GPU resource copies. 
 
+# 以下为原始项目信息
 ## Installation
 
 This demo requires the DirectX SDK to be installed, and may require the Windows SDK to be installed as well. 
@@ -16,6 +17,8 @@ This demo requires the DirectX SDK to be installed, and may require the Windows 
 
 Since the time the original article was written, it seems that either the Nvidia driver or modern Nvidia cards, as well as the most recent Intel graphics (Skylake) no longer supports this extension, resulting in failures ranging from black screens to driver crashes. I haven't tested on the most recent AMD cards. I was able to verify that with slightly older Intel hardware (Haswell, HD 4200 - HD 5200) that this extension works across Windows 7, Windows 8.1, and Windows 10. I had previously tested with older AMD hardware (HD 6950) and older Nvidia hardware (GTX 570) which both worked with the texture and offscreen plain methods on Windows 7. 
 
-## License
+# ==>做了如下更改
 
-MIT Licensed, see [LICENSE](https://github.com/halogenica/WGL_NV_DX/blob/master/LICENSE).
+* 修改DX9为DX11，API做了对于修改
+* 封装了openGL部分，可以用在其它项目中
+* OpenGL的这个扩展在Intel和NV上都可以用，我的X1机器可以运行
