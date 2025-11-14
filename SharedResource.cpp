@@ -3,8 +3,9 @@
 #include <dxgi1_2.h>
 #include <DirectXMath.h>
 #include <assert.h>
-#include "glew.h"
-#include "wglew.h"
+#include <memory>
+#include <stdexcept>
+#include "OpenGLSharedRenderer.h"
 #include <chrono>
 #include <d3dcompiler.h>
 #include <wrl/client.h>
@@ -31,10 +32,7 @@ ID3D11RenderTargetView* g_pRenderTargetView = nullptr;
 ID3D11Texture2D* g_pSharedTex = nullptr;
 HANDLE g_hSharedHandle = nullptr;
 
-GLuint g_GLTexture = 0;
-HANDLE g_hGLShared = nullptr;
-HANDLE g_hDXDevice = nullptr;
-HDC g_hDCGL = nullptr;
+std::unique_ptr<OpenGLSharedRenderer> g_OpenGLRenderer;
 
 struct SimpleVertex
 {
@@ -210,41 +208,16 @@ void InitDX(HWND hWnd)
 
 void InitGL(HWND hWnd)
 {
-    static PIXELFORMATDESCRIPTOR pfd =
+    g_OpenGLRenderer = std::make_unique<OpenGLSharedRenderer>(SCREEN_WIDTH, SCREEN_HEIGHT);
+    if (!g_OpenGLRenderer->Initialize(hWnd))
     {
-        sizeof(PIXELFORMATDESCRIPTOR),
-        1,
-        PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
-        PFD_TYPE_RGBA,
-        32,
-        0,0,0,0,0,0,
-        0,0,0,0,0,0,0,
-        24,0,0,
-        PFD_MAIN_PLANE,0,0,0,0
-    };
-
-    g_hDCGL = GetDC(hWnd);
-    int pixelFormat = ChoosePixelFormat(g_hDCGL, &pfd);
-    SetPixelFormat(g_hDCGL, pixelFormat, &pfd);
-    HGLRC hRC = wglCreateContext(g_hDCGL);
-    wglMakeCurrent(g_hDCGL, hRC);
-    glewInit();
-
-    if (WGLEW_NV_DX_interop2)
-    {
-        g_hDXDevice = wglDXOpenDeviceNV(g_pd3dDevice);
-        glGenTextures(1, &g_GLTexture);
-
-        wglDXSetResourceShareHandleNV(g_pSharedTex, g_hSharedHandle);
-        g_hGLShared = wglDXRegisterObjectNV(g_hDXDevice,
-            g_pSharedTex, g_GLTexture, GL_TEXTURE_2D, WGL_ACCESS_READ_ONLY_NV);
+        throw std::runtime_error("Failed to initialize OpenGL renderer");
     }
 
-    glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, -1, 1);
-    glDisable(GL_DEPTH_TEST);
+    if (!g_OpenGLRenderer->SetupSharedTexture(g_pd3dDevice, g_pSharedTex, g_hSharedHandle))
+    {
+        throw std::runtime_error("Failed to share DirectX texture with OpenGL");
+    }
 }
 
 void RenderDX()
@@ -276,32 +249,18 @@ void RenderDX()
 
 void RenderGL()
 {
-    glClear(GL_COLOR_BUFFER_BIT);
-    if (g_hDXDevice && g_hGLShared)
+    if (g_OpenGLRenderer)
     {
-        wglDXLockObjectsNV(g_hDXDevice, 1, &g_hGLShared);
-        glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, g_GLTexture);
-
-        glBegin(GL_QUADS);
-        glTexCoord2f(0, 0); glVertex2f(0, 0);
-        glTexCoord2f(0, 1); glVertex2f(0, SCREEN_HEIGHT);
-        glTexCoord2f(1, 1); glVertex2f(SCREEN_WIDTH, SCREEN_HEIGHT);
-        glTexCoord2f(1, 0); glVertex2f(SCREEN_WIDTH, 0);
-        glEnd();
-        wglDXUnlockObjectsNV(g_hDXDevice, 1, &g_hGLShared);
-
-        SwapBuffers(g_hDCGL);
-
+        g_OpenGLRenderer->Render();
     }
 }
 
 void Destroy()
 {
-    if (WGLEW_NV_DX_interop2)
+    if (g_OpenGLRenderer)
     {
-        if (g_hGLShared) wglDXUnregisterObjectNV(g_hDXDevice, g_hGLShared);
-        if (g_hDXDevice) wglDXCloseDeviceNV(g_hDXDevice);
+        g_OpenGLRenderer->Cleanup();
+        g_OpenGLRenderer.reset();
     }
 }
 
