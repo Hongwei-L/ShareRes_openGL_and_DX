@@ -17,8 +17,8 @@ using namespace DirectX;
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib,"d3dcompiler.lib")
 
-#define SCREEN_WIDTH  300
-#define SCREEN_HEIGHT 300
+#define SCREEN_WIDTH  1024
+#define SCREEN_HEIGHT 1024
 #define KEYDOWN(vk) (GetAsyncKeyState(vk) & 0x8000)
 
 HWND g_hWndDX = nullptr;
