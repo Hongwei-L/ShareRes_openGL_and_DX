@@ -29,4 +29,5 @@ private:
     HANDLE m_dxDeviceHandle;
     ID3D11Texture2D* m_sharedTexture;
     HANDLE m_sharedHandle;
+    bool m_isStereoContext;
 };
