@@ -8,9 +8,9 @@
 #include "OpenGLSharedRenderer.h"
 #include <chrono>
 #include <d3dcompiler.h>
-#include <wrl/client.h>
+#include <winrt/base.h>
 
-using Microsoft::WRL::ComPtr;
+using winrt::com_ptr;
 using namespace DirectX;
 
 #pragma comment(lib, "d3d11.lib")
@@ -40,12 +40,12 @@ struct SimpleVertex
     XMFLOAT4 Color;
 };
 
-ComPtr<ID3D11Buffer> g_pVertexBuffer;
-ComPtr<ID3D11VertexShader> g_pVertexShader;
-ComPtr<ID3D11PixelShader> g_pPixelShader;
-ComPtr<ID3D11InputLayout> g_pVertexLayout;
-ComPtr<ID3D11RenderTargetView> g_pSharedRTV;
-ComPtr<ID3D11Buffer> g_pConstantBuffer;
+com_ptr<ID3D11Buffer> g_pVertexBuffer;
+com_ptr<ID3D11VertexShader> g_pVertexShader;
+com_ptr<ID3D11PixelShader> g_pPixelShader;
+com_ptr<ID3D11InputLayout> g_pVertexLayout;
+com_ptr<ID3D11RenderTargetView> g_pSharedRTV;
+com_ptr<ID3D11Buffer> g_pConstantBuffer;
 
 // ===== D3D11 shader (HLSL embedded) =====
 const char* g_VS =
@@ -132,9 +132,9 @@ void InitDX(HWND hWnd)
         D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, nullptr, &g_pImmediateContext);
 
     // Create render target view
-    ComPtr<ID3D11Texture2D> pBackBuffer;
-    g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
-    g_pd3dDevice->CreateRenderTargetView(pBackBuffer.Get(), nullptr, &g_pRenderTargetView);
+    com_ptr<ID3D11Texture2D> pBackBuffer;
+    g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(pBackBuffer.put()));
+    g_pd3dDevice->CreateRenderTargetView(pBackBuffer.get(), nullptr, &g_pRenderTargetView);
 
     // Create shared texture
     D3D11_TEXTURE2D_DESC desc{};
@@ -149,20 +149,20 @@ void InitDX(HWND hWnd)
     g_pd3dDevice->CreateTexture2D(&desc, nullptr, &g_pSharedTex);
 
     // Get shared handle
-    ComPtr<IDXGIResource> dxgiRes;
-    g_pSharedTex->QueryInterface(IID_PPV_ARGS(&dxgiRes));
+    com_ptr<IDXGIResource> dxgiRes;
+    g_pSharedTex->QueryInterface(IID_PPV_ARGS(dxgiRes.put()));
     dxgiRes->GetSharedHandle(&g_hSharedHandle);
 
     // Create RTV for shared texture
-    g_pd3dDevice->CreateRenderTargetView(g_pSharedTex, nullptr, &g_pSharedRTV);
+    g_pd3dDevice->CreateRenderTargetView(g_pSharedTex, nullptr, g_pSharedRTV.put());
 
     // Compile shaders
-    ComPtr<ID3DBlob> vsBlob, psBlob;
-    D3DCompile(g_VS, strlen(g_VS), nullptr, nullptr, nullptr, "main", "vs_4_0", 0, 0, &vsBlob, nullptr);
-    D3DCompile(g_PS, strlen(g_PS), nullptr, nullptr, nullptr, "main", "ps_4_0", 0, 0, &psBlob, nullptr);
+    com_ptr<ID3DBlob> vsBlob, psBlob;
+    D3DCompile(g_VS, strlen(g_VS), nullptr, nullptr, nullptr, "main", "vs_4_0", 0, 0, vsBlob.put(), nullptr);
+    D3DCompile(g_PS, strlen(g_PS), nullptr, nullptr, nullptr, "main", "ps_4_0", 0, 0, psBlob.put(), nullptr);
 
-    g_pd3dDevice->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &g_pVertexShader);
-    g_pd3dDevice->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &g_pPixelShader);
+    g_pd3dDevice->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, g_pVertexShader.put());
+    g_pd3dDevice->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, g_pPixelShader.put());
 
     // Input layout
     D3D11_INPUT_ELEMENT_DESC layout[] =
@@ -171,7 +171,7 @@ void InitDX(HWND hWnd)
         {"COLOR",0,DXGI_FORMAT_R32G32B32A32_FLOAT,0,12,D3D11_INPUT_PER_VERTEX_DATA,0}
     };
     g_pd3dDevice->CreateInputLayout(layout, 2, vsBlob->GetBufferPointer(),
-        vsBlob->GetBufferSize(), &g_pVertexLayout);
+        vsBlob->GetBufferSize(), g_pVertexLayout.put());
 
     // Create vertex buffer
     SimpleVertex vertices[] =
@@ -186,7 +186,7 @@ void InitDX(HWND hWnd)
     bd.ByteWidth = sizeof(SimpleVertex) * 3;
     bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
     D3D11_SUBRESOURCE_DATA initData{ vertices };
-    g_pd3dDevice->CreateBuffer(&bd, &initData, &g_pVertexBuffer);
+    g_pd3dDevice->CreateBuffer(&bd, &initData, g_pVertexBuffer.put());
 
     // Create viewport
     D3D11_VIEWPORT vp{};
@@ -203,7 +203,7 @@ void InitDX(HWND hWnd)
     cbDesc.ByteWidth = sizeof(XMMATRIX);
     cbDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     D3D11_SUBRESOURCE_DATA cbInit{ &identity };
-    g_pd3dDevice->CreateBuffer(&cbDesc, &cbInit, &g_pConstantBuffer);
+    g_pd3dDevice->CreateBuffer(&cbDesc, &cbInit, g_pConstantBuffer.put());
 }
 
 void InitGL(HWND hWnd)
@@ -226,20 +226,23 @@ void RenderDX()
     angle += 0.18f;
     XMMATRIX mWorldViewProj = XMMatrixTranspose(XMMatrixRotationZ(angle));
 
-    g_pImmediateContext->UpdateSubresource(g_pConstantBuffer.Get(), 0, nullptr, &mWorldViewProj, 0, 0);
-    g_pImmediateContext->VSSetConstantBuffers(0, 1, g_pConstantBuffer.GetAddressOf());
+    g_pImmediateContext->UpdateSubresource(g_pConstantBuffer.get(), 0, nullptr, &mWorldViewProj, 0, 0);
+    ID3D11Buffer* constantBuffer = g_pConstantBuffer.get();
+    g_pImmediateContext->VSSetConstantBuffers(0, 1, &constantBuffer);
 
     float clearColor[4] = { 0.1f, 0.1f, 0.3f, 1.0f };
-    g_pImmediateContext->OMSetRenderTargets(1, g_pSharedRTV.GetAddressOf(), nullptr);
-    g_pImmediateContext->ClearRenderTargetView(g_pSharedRTV.Get(), clearColor);
+    ID3D11RenderTargetView* sharedRTV = g_pSharedRTV.get();
+    g_pImmediateContext->OMSetRenderTargets(1, &sharedRTV, nullptr);
+    g_pImmediateContext->ClearRenderTargetView(sharedRTV, clearColor);
 
     UINT stride = sizeof(SimpleVertex);
     UINT offset = 0;
-    g_pImmediateContext->IASetInputLayout(g_pVertexLayout.Get());
-    g_pImmediateContext->IASetVertexBuffers(0, 1, g_pVertexBuffer.GetAddressOf(), &stride, &offset);
+    g_pImmediateContext->IASetInputLayout(g_pVertexLayout.get());
+    ID3D11Buffer* vertexBuffer = g_pVertexBuffer.get();
+    g_pImmediateContext->IASetVertexBuffers(0, 1, &vertexBuffer, &stride, &offset);
     g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    g_pImmediateContext->VSSetShader(g_pVertexShader.Get(), nullptr, 0);
-    g_pImmediateContext->PSSetShader(g_pPixelShader.Get(), nullptr, 0);
+    g_pImmediateContext->VSSetShader(g_pVertexShader.get(), nullptr, 0);
+    g_pImmediateContext->PSSetShader(g_pPixelShader.get(), nullptr, 0);
     g_pImmediateContext->Draw(3, 0);
     g_pImmediateContext->Flush();
 
