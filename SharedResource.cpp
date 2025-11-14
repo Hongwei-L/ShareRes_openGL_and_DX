@@ -223,7 +223,7 @@ void InitGL(HWND hWnd)
 void RenderDX()
 {
     static float angle = 0.0f;
-    angle += 0.02f;
+    angle += 0.18f;
     XMMATRIX mWorldViewProj = XMMatrixTranspose(XMMatrixRotationZ(angle));
 
     g_pImmediateContext->UpdateSubresource(g_pConstantBuffer.Get(), 0, nullptr, &mWorldViewProj, 0, 0);
