@@ -13,6 +13,7 @@ OpenGLSharedRenderer::OpenGLSharedRenderer(int width, int height)
     , m_dxDeviceHandle(nullptr)
     , m_sharedTexture(nullptr)
     , m_sharedHandle(nullptr)
+    , m_isStereoContext(false)
 {
 }
 
@@ -28,11 +29,11 @@ bool OpenGLSharedRenderer::Initialize(HWND hwnd)
         return false;
     }
 
-    static PIXELFORMATDESCRIPTOR pfd =
+    PIXELFORMATDESCRIPTOR pfd =
     {
         sizeof(PIXELFORMATDESCRIPTOR),
         1,
-        PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
+        PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER | PFD_STEREO,
         PFD_TYPE_RGBA,
         32,
         0,0,0,0,0,0,
@@ -70,6 +71,10 @@ bool OpenGLSharedRenderer::Initialize(HWND hwnd)
     {
         return false;
     }
+
+    GLboolean stereo = GL_FALSE;
+    glGetBooleanv(GL_STEREO, &stereo);
+    m_isStereoContext = (stereo == GL_TRUE);
 
     ConfigureViewport();
     return true;
@@ -119,23 +124,36 @@ bool OpenGLSharedRenderer::SetupSharedTexture(ID3D11Device* device, ID3D11Textur
 
 void OpenGLSharedRenderer::Render()
 {
-    glClear(GL_COLOR_BUFFER_BIT);
-
     if (!m_dxDeviceHandle || !m_glSharedHandle)
     {
         return;
     }
 
     wglDXLockObjectsNV(m_dxDeviceHandle, 1, &m_glSharedHandle);
-    glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, m_glTexture);
+    auto renderToBuffer = [&](GLenum buffer)
+    {
+        glDrawBuffer(buffer);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, m_glTexture);
 
-    glBegin(GL_QUADS);
-    glTexCoord2f(0, 0); glVertex2f(0, 0);
-    glTexCoord2f(0, 1); glVertex2f(0, static_cast<GLfloat>(m_height));
-    glTexCoord2f(1, 1); glVertex2f(static_cast<GLfloat>(m_width), static_cast<GLfloat>(m_height));
-    glTexCoord2f(1, 0); glVertex2f(static_cast<GLfloat>(m_width), 0);
-    glEnd();
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 0); glVertex2f(0, 0);
+        glTexCoord2f(0, 1); glVertex2f(0, static_cast<GLfloat>(m_height));
+        glTexCoord2f(1, 1); glVertex2f(static_cast<GLfloat>(m_width), static_cast<GLfloat>(m_height));
+        glTexCoord2f(1, 0); glVertex2f(static_cast<GLfloat>(m_width), 0);
+        glEnd();
+    };
+
+    if (m_isStereoContext)
+    {
+        renderToBuffer(GL_BACK_LEFT);
+        renderToBuffer(GL_BACK_RIGHT);
+    }
+    else
+    {
+        renderToBuffer(GL_BACK);
+    }
 
     wglDXUnlockObjectsNV(m_dxDeviceHandle, 1, &m_glSharedHandle);
 
